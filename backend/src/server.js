@@ -1,4 +1,5 @@
 require('dotenv').config();
+
 const express = require('express');
 const http = require('http');
 const cors = require('cors');
@@ -17,25 +18,32 @@ const setupSignaling = require('./sockets/signaling');
 const app = express();
 const server = http.createServer(app);
 
-// ✅ FIXED CORS
+// 🔥 SECURITY + CORS (ALLOW ALL DEVICES)
+app.use(helmet());
+
 app.use(cors({
-  origin: "http://localhost:5173",
-  credentials: true
+  origin: "*",          // ✅ allow any device (important)
+  methods: ["GET", "POST", "PATCH", "PUT", "DELETE"],
+  credentials: false
 }));
 
-app.use(helmet());
 app.use(express.json({ limit: '10mb' }));
 
-// ✅ FIXED RATE LIMIT
+// 🔥 RATE LIMIT (only for auth)
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 200
 });
 app.use('/api/auth', limiter);
 
-// Routes
-app.get('/', (req, res) => res.json({ status: 'API running' }));
-app.get('/health', (req, res) => res.json({ status: 'ok' }));
+// 🔥 ROUTES
+app.get('/', (req, res) => {
+  res.json({ status: 'Rural Expert API running' });
+});
+
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok' });
+});
 
 app.use('/api/auth', authRoutes);
 app.use('/api/experts', expertRoutes);
@@ -44,11 +52,40 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/schemes', schemeRoutes);
 app.use('/api/crops', cropRoutes);
 
-// Socket
-const io = new Server(server, {
-  cors: { origin: "http://localhost:5173" }
+// 🔥 TURN / STUN CONFIG
+app.get('/api/turn-credentials', (req, res) => {
+  res.json({
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' },
+      {
+        urls: 'turn:a.relay.metered.ca:80',
+        username: process.env.METERED_TURN_USERNAME,
+        credential: process.env.METERED_TURN_CREDENTIAL
+      },
+      {
+        urls: 'turn:a.relay.metered.ca:443',
+        username: process.env.METERED_TURN_USERNAME,
+        credential: process.env.METERED_TURN_CREDENTIAL
+      }
+    ]
+  });
 });
+
+// 🔥 SOCKET.IO (ALLOW ALL ORIGINS)
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+});
+
+// 🔥 SIGNALING LOGIC
 setupSignaling(io);
 
+// 🔥 IMPORTANT: LISTEN ON ALL NETWORKS
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Server running on http://0.0.0.0:${PORT}`);
+});

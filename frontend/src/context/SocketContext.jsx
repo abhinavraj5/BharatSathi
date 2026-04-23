@@ -10,13 +10,37 @@ export function SocketProvider({ children }) {
 
   useEffect(() => {
     if (!user) return;
-    const s = io(import.meta.env.VITE_SOCKET_URL);
-    s.on('connect', () => s.emit('register', { userId: user.id }));
+
+    const url = import.meta.env.VITE_SOCKET_URL;
+    console.log("🔌 Connecting to:", url);
+
+    const s = io(url, {
+      transports: ['websocket'],
+      withCredentials: false
+    });
+
+    s.on('connect', () => {
+      console.log("✅ SOCKET CONNECTED:", s.id, "USER:", user.id);
+      s.emit('register', { userId: user.id });
+    });
+
+    s.on('connect_error', (err) => {
+      console.error("❌ Socket connect_error:", err.message);
+    });
+
+    s.on('disconnect', () => {
+      console.log("❌ Socket disconnected");
+    });
+
     setSocket(s);
     return () => s.disconnect();
   }, [user]);
 
-  return <SocketContext.Provider value={socket}>{children}</SocketContext.Provider>;
+  return (
+    <SocketContext.Provider value={socket}>
+      {children}
+    </SocketContext.Provider>
+  );
 }
 
 export const useSocket = () => useContext(SocketContext);

@@ -14,7 +14,7 @@ export default function Navbar() {
 
         {user ? (
           <>
-            <Link to={profile?.role === 'expert' ? '/expert' : '/dashboard'}>
+            <Link to={profile && profile.role === 'expert' ? '/expert' : '/dashboard'}>
               Dashboard
             </Link>
 
