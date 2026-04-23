@@ -11,7 +11,16 @@ import ExpertDashboard from './pages/ExpertDashboard';
 import Schemes from './pages/Schemes';
 
 function Protected({ children }) {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        Loading...
+      </div>
+    );
+  }
+
   return user ? children : <Navigate to="/login" replace />;
 }
 
@@ -19,7 +28,6 @@ function AppContent() {
   return (
     <>
       <Navbar />
-
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
@@ -44,6 +52,8 @@ function AppContent() {
         />
 
         <Route path="/schemes" element={<Schemes />} />
+
+        {/* fallback route */}
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </>
