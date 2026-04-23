@@ -10,25 +10,31 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const getSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
 
-      setUser(session?.user ?? null);
+        setUser(session?.user ?? null);
 
-      if (session?.user) {
-        await loadProfile(session.user.id);
+        if (session?.user) {
+          loadProfile(session.user.id); // ❌ no await (important)
+        }
+
+      } catch (err) {
+        console.error("Session error:", err);
       }
 
+      // ✅ ALWAYS STOP LOADING
       setLoading(false);
     };
 
     getSession();
 
     const { data: { subscription } } =
-      supabase.auth.onAuthStateChange(async (_event, session) => {
+      supabase.auth.onAuthStateChange((_event, session) => {
         setUser(session?.user ?? null);
 
         if (session?.user) {
-          await loadProfile(session.user.id);
+          loadProfile(session.user.id);
         } else {
           setProfile(null);
         }
@@ -54,7 +60,7 @@ export function AuthProvider({ children }) {
 
       setProfile(data);
     } catch (err) {
-      console.error("Unexpected error:", err);
+      console.error("Profile fetch failed:", err);
     }
   }
 
@@ -67,7 +73,7 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider value={{ user, profile, loading, signOut }}>
-      {!loading && children}
+      {!loading ? children : <div className="p-8 text-center">Loading App...</div>}
     </AuthContext.Provider>
   );
 }
