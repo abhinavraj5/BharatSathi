@@ -17,23 +17,24 @@ const setupSignaling = require('./sockets/signaling');
 const app = express();
 const server = http.createServer(app);
 
-// Security
-app.use(helmet());
+// ✅ FIXED CORS
 app.use(cors({
-  origin: process.env.FRONTEND_URL || '*',
+  origin: "http://localhost:5173",
   credentials: true
 }));
+
+app.use(helmet());
 app.use(express.json({ limit: '10mb' }));
 
-// Rate limiting
+// ✅ FIXED RATE LIMIT
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 200
 });
-app.use('/api/', limiter);
+app.use('/api/auth', limiter);
 
 // Routes
-app.get('/', (req, res) => res.json({ status: 'Rural Expert API running' }));
+app.get('/', (req, res) => res.json({ status: 'API running' }));
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
 app.use('/api/auth', authRoutes);
@@ -43,29 +44,9 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/schemes', schemeRoutes);
 app.use('/api/crops', cropRoutes);
 
-// TURN credentials endpoint
-app.get('/api/turn-credentials', (req, res) => {
-  res.json({
-    iceServers: [
-      { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'stun:stun1.l.google.com:19302' },
-      {
-        urls: 'turn:a.relay.metered.ca:80',
-        username: process.env.METERED_TURN_USERNAME,
-        credential: process.env.METERED_TURN_CREDENTIAL
-      },
-      {
-        urls: 'turn:a.relay.metered.ca:443',
-        username: process.env.METERED_TURN_USERNAME,
-        credential: process.env.METERED_TURN_CREDENTIAL
-      }
-    ]
-  });
-});
-
-// Socket.io
+// Socket
 const io = new Server(server, {
-  cors: { origin: process.env.FRONTEND_URL || '*' }
+  cors: { origin: "http://localhost:5173" }
 });
 setupSignaling(io);
 

@@ -9,31 +9,65 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (session?.user) await loadProfile(session.user.id);
-      setLoading(false);
-    });
+    const getSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setUser(session?.user ?? null);
-      if (session?.user) await loadProfile(session.user.id);
-      else setProfile(null);
-    });
+
+      if (session?.user) {
+        await loadProfile(session.user.id);
+      }
+
+      setLoading(false);
+    };
+
+    getSession();
+
+    const { data: { subscription } } =
+      supabase.auth.onAuthStateChange(async (_event, session) => {
+        setUser(session?.user ?? null);
+
+        if (session?.user) {
+          await loadProfile(session.user.id);
+        } else {
+          setProfile(null);
+        }
+
+        setLoading(false);
+      });
 
     return () => subscription.unsubscribe();
   }, []);
 
   async function loadProfile(userId) {
-    const { data } = await supabase.from('users').select('*').eq('id', userId).single();
-    setProfile(data);
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (error) {
+        console.error("Profile error:", error);
+        return;
+      }
+
+      setProfile(data);
+    } catch (err) {
+      console.error("Unexpected error:", err);
+    }
   }
 
-  const signOut = () => supabase.auth.signOut();
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+    setProfile(null);
+    window.location.href = "/login";
+  };
 
   return (
     <AuthContext.Provider value={{ user, profile, loading, signOut }}>
-      {children}
+      {!loading && children}
     </AuthContext.Provider>
   );
 }
