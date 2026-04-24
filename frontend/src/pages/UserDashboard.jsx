@@ -1,25 +1,46 @@
-import { useState } from 'react';
-import ChatBot from '../components/ChatBot';
-import ExpertList from '../components/ExpertList';
-import CropUpload from '../components/CropUpload';
-import VideoCall from '../components/VideoCall';
+import { useEffect } from "react";
+import { useSocket } from "../context/SocketContext";
+import ExpertList from "../components/ExpertList";
 
-export default function UserDashboard() {
-  const [tab, setTab] = useState('experts');
-  const [activeCall, setActiveCall] = useState(null);
+export default function UserDashboard({ user, experts, onStartCall }) {
+  const socket = useSocket();
 
-  if (activeCall) return <VideoCall call={activeCall} onEnd={() => setActiveCall(null)} />;
+  // ✅ REGISTER USER
+  useEffect(() => {
+    if (socket && user?.id) {
+      socket.emit("register", user.id);
+      console.log("✅ Registered:", user.id);
+    }
+  }, [socket, user]);
+
+  // 📞 START CALL
+  function startCall(expert) {
+    if (!socket) {
+      alert("Socket not connected");
+      return;
+    }
+
+    const callId = `${user.id}-${expert.id}-${Date.now()}`;
+
+    socket.emit("call-request", {
+      expertId: expert.id,
+      callerId: user.id,
+      callerName: user.email,
+      callId,
+    });
+
+    onStartCall({
+      peerId: expert.id,
+      callId,
+      isInitiator: true,
+    });
+  }
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
-      <div className="flex gap-2 mb-6 flex-wrap">
-        <button onClick={() => setTab('experts')} className={`px-4 py-2 rounded ${tab==='experts'?'bg-green-600 text-white':'bg-gray-200'}`}>📞 Experts</button>
-        <button onClick={() => setTab('ai')} className={`px-4 py-2 rounded ${tab==='ai'?'bg-green-600 text-white':'bg-gray-200'}`}>🤖 AI Chat</button>
-        <button onClick={() => setTab('crop')} className={`px-4 py-2 rounded ${tab==='crop'?'bg-green-600 text-white':'bg-gray-200'}`}>🌱 Crop</button>
-      </div>
-      {tab === 'experts' && <ExpertList onStartCall={setActiveCall} />}
-      {tab === 'ai' && <ChatBot />}
-      {tab === 'crop' && <CropUpload />}
+    <div>
+      <h2>User Dashboard</h2>
+
+      <ExpertList experts={experts} onCall={startCall} />
     </div>
   );
 }

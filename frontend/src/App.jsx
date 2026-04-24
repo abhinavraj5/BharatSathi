@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
 
@@ -11,52 +11,49 @@ import ExpertDashboard from './pages/ExpertDashboard';
 import Schemes from './pages/Schemes';
 
 function Protected({ children }) {
-  const { user } = useAuth();
-  return user ? children : <Navigate to="/login" replace />;
+  const { user, loading } = useAuth();
+  if (loading) return <div>Loading...</div>;
+  return user ? children : <Navigate to="/login" />;
 }
 
-function AppContent() {
-  return (
-    <>
-      <Navbar />
+function ExpertProtected({ children }) {
+  const { user, profile, loading } = useAuth();
 
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/signup" element={<Signup />} />
+  if (loading) return <div>Loading...</div>;
 
-        <Route
-          path="/dashboard"
-          element={
-            <Protected>
-              <UserDashboard />
-            </Protected>
-          }
-        />
+  if (!user || profile?.role !== "expert") {
+    return <Navigate to="/dashboard" />;
+  }
 
-        <Route
-          path="/expert"
-          element={
-            <Protected>
-              <ExpertDashboard />
-            </Protected>
-          }
-        />
-
-        <Route path="/schemes" element={<Schemes />} />
-        <Route path="*" element={<Navigate to="/" />} />
-      </Routes>
-    </>
-  );
+  return children;
 }
 
 export default function App() {
   return (
     <AuthProvider>
       <SocketProvider>
-        <BrowserRouter>
-          <AppContent />
-        </BrowserRouter>
+        <Navbar />
+
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+
+          <Route path="/dashboard" element={
+            <Protected>
+              <UserDashboard />
+            </Protected>
+          } />
+
+          <Route path="/expert" element={
+            <ExpertProtected>
+              <ExpertDashboard />
+            </ExpertProtected>
+          } />
+
+          <Route path="/schemes" element={<Schemes />} />
+        </Routes>
+
       </SocketProvider>
     </AuthProvider>
   );

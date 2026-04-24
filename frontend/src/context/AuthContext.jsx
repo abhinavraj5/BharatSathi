@@ -10,32 +10,26 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const getSession = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await supabase.auth.getSession();
 
-        setUser(session?.user ?? null);
-
-        if (session?.user) {
-          loadProfile(session.user.id); // ❌ no await (important)
-        }
-
-      } catch (err) {
-        console.error("Session error:", err);
+      if (session?.user) {
+        setUser(session.user);
+        await loadProfile(session.user.id);
       }
 
-      // ✅ ALWAYS STOP LOADING
       setLoading(false);
     };
 
     getSession();
 
     const { data: { subscription } } =
-      supabase.auth.onAuthStateChange((_event, session) => {
-        setUser(session?.user ?? null);
+      supabase.auth.onAuthStateChange(async (_event, session) => {
 
         if (session?.user) {
-          loadProfile(session.user.id);
+          setUser(session.user);
+          await loadProfile(session.user.id);
         } else {
+          setUser(null);
           setProfile(null);
         }
 
@@ -46,22 +40,18 @@ export function AuthProvider({ children }) {
   }, []);
 
   async function loadProfile(userId) {
-    try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', userId)
-        .single();
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', userId)
+      .single();
 
-      if (error) {
-        console.error("Profile error:", error);
-        return;
-      }
-
-      setProfile(data);
-    } catch (err) {
-      console.error("Profile fetch failed:", err);
+    if (error) {
+      console.error("Profile error:", error);
+      return;
     }
+
+    setProfile(data);
   }
 
   const signOut = async () => {
@@ -73,7 +63,7 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider value={{ user, profile, loading, signOut }}>
-      {!loading ? children : <div className="p-8 text-center">Loading App...</div>}
+      {!loading && children}
     </AuthContext.Provider>
   );
 }

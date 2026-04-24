@@ -1,82 +1,93 @@
-const express = require("express");
-const http = require("http");
-const { Server } = require("socket.io");
-const cors = require("cors");
+import express from "express";
+import http from "http";
+import { Server } from "socket.io";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const app = express();
-app.use(cors());
-
 const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: "*", // change to frontend URL in production
-    methods: ["GET", "POST"]
-  }
+    origin: "*",
+  },
 });
 
-const users = {}; // { userId: socketId }
+app.use(express.json());
 
+let users = {}; // { userId: socketId }
+
+// 🔥 SOCKET
 io.on("connection", (socket) => {
   console.log("🟢 Connected:", socket.id);
 
-  // ✅ Register user
+  // ✅ REGISTER USER
   socket.on("register", (userId) => {
+    if (typeof userId === "object") userId = userId.userId;
+
     users[userId] = socket.id;
-    socket.userId = userId;
 
     console.log("✅ Registered:", userId);
     console.log("🔥 Users:", users);
   });
 
-  // 📞 Call user
-  socket.on("call-user", ({ to, offer }) => {
-    const targetSocket = users[to];
+  // 📞 CALL REQUEST (USER → EXPERT)
+  socket.on("call-request", ({ expertId, callerId, callerName, callId }) => {
+    const expertSocket = users[expertId];
 
-    if (targetSocket) {
-      console.log("📞 Calling:", to);
-
-      io.to(targetSocket).emit("incoming-call", {
-        from: socket.userId,
-        offer
-      });
-    } else {
-      console.log("❌ User not found:", to);
-    }
-  });
-
-  // ✅ Answer call
-  socket.on("answer-call", ({ to, answer }) => {
-    const targetSocket = users[to];
-
-    if (targetSocket) {
-      io.to(targetSocket).emit("call-answered", {
-        answer
+    if (expertSocket) {
+      io.to(expertSocket).emit("incoming-call", {
+        callerId,
+        callerName,
+        callId,
       });
     }
   });
 
-  // ICE candidates
+  // ✅ CALL RESPONSE (EXPERT → USER)
+  socket.on("call-response", ({ callerId, accepted, callId }) => {
+    const callerSocket = users[callerId];
+
+    if (callerSocket) {
+      io.to(callerSocket).emit("call-response", {
+        accepted,
+        callId,
+      });
+    }
+  });
+
+  // 🔄 WEBRTC SIGNALS
+  socket.on("offer", ({ to, offer }) => {
+    io.to(users[to]).emit("offer", { offer, from: socket.id });
+  });
+
+  socket.on("answer", ({ to, answer }) => {
+    io.to(users[to]).emit("answer", { answer });
+  });
+
   socket.on("ice-candidate", ({ to, candidate }) => {
-    const targetSocket = users[to];
-
-    if (targetSocket) {
-      io.to(targetSocket).emit("ice-candidate", {
-        candidate
-      });
-    }
+    io.to(users[to]).emit("ice-candidate", { candidate });
   });
 
-  // ❌ Disconnect
+  socket.on("end-call", ({ to }) => {
+    io.to(users[to]).emit("call-ended");
+  });
+
+  // ❌ DISCONNECT
   socket.on("disconnect", () => {
-    if (socket.userId) {
-      delete users[socket.userId];
-      console.log("🔴 Disconnected:", socket.userId);
-      console.log("🔥 Remaining users:", users);
+    console.log("🔴 Disconnected:", socket.id);
+
+    for (let id in users) {
+      if (users[id] === socket.id) delete users[id];
     }
+
+    console.log("🔥 Remaining:", users);
   });
 });
 
-server.listen(5000, "0.0.0.0", () => {
-  console.log("🚀 Server running on http://0.0.0.0:5000");
+const PORT = process.env.PORT || 5000;
+
+server.listen(PORT, "0.0.0.0", () => {
+  console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
